@@ -43,6 +43,19 @@ if (isVersionFastPath(process.argv)) {
   process.exit(0);
 }
 
+// MCP stdio transport uses stdout exclusively for JSON-RPC messages. Redirect
+// console.log/warn to stderr before anything else runs — including the tsx/esm and
+// polyfill imports below, since those (and their transitive module graphs, e.g. DB
+// init) can themselves log during evaluation. Redirecting after those imports let
+// early output leak straight into the JSON-RPC stream and corrupt it client-side
+// (e.g. Claude Desktop: "Unexpected token 'D', \"[DB] Changi\"... is not valid JSON").
+if (process.argv.includes("--mcp")) {
+  const { Console } = await import("node:console");
+  const stderrConsole = new Console({ stdout: process.stderr, stderr: process.stderr });
+  console.log = stderrConsole.log.bind(stderrConsole);
+  console.warn = stderrConsole.warn.bind(stderrConsole);
+}
+
 // Register tsx so dynamic imports of .ts source files (referenced as .js per
 // TypeScript conventions) resolve correctly. The build never emits .js for
 // src/lib/cli-helper/, so tsx handles the .ts → .js resolution at runtime.
@@ -58,16 +71,6 @@ await import("../open-sse/utils/setupPolyfill.ts");
 const { registerAliasResolver } = await import("./aliasResolver.mjs");
 await registerAliasResolver(ROOT);
 
-// MCP stdio transport uses stdout exclusively for JSON-RPC messages.
-// Redirect console.log/warn to stderr early (before loadEnvFile and DB init)
-// so no startup output corrupts the protocol.
-if (process.argv.includes("--mcp")) {
-  const { Console } = await import("node:console");
-  const stderrConsole = new Console({ stdout: process.stderr, stderr: process.stderr });
-  console.log = stderrConsole.log.bind(stderrConsole);
-  console.warn = stderrConsole.warn.bind(stderrConsole);
-}
-
 // Electron persists secrets (JWT_SECRET, API_KEY_SECRET, STORAGE_ENCRYPTION_KEY) to
 // `<DATA_DIR>/server.env` (electron/main.js), never `.env`. Migrating an existing
 // install (storage.sqlite + server.env) to the CLI left those secrets undiscoverable —
@@ -82,9 +85,7 @@ function migrateElectronServerEnv(dataDir) {
     const serverEnvPath = join(dataDir, "server.env");
     if (existsSync(envPath) || !existsSync(serverEnvPath)) return;
     writeFileSync(envPath, readFileSync(serverEnvPath, "utf-8"), "utf-8");
-    console.log(
-      `  \x1b[2m♻ Migrated Electron secrets from ${serverEnvPath} to ${envPath}\x1b[0m`
-    );
+    console.log(`  \x1b[2m♻ Migrated Electron secrets from ${serverEnvPath} to ${envPath}\x1b[0m`);
   } catch {
     // Ignore errors migrating server.env — fall back to normal env loading below.
   }
@@ -224,9 +225,7 @@ if (shouldProvisionStorageKey(process.argv)) {
   const langEnv = process.env.OMNIROUTE_LANG;
   const chosen = langArg || langEnv;
   if (chosen) {
-    const { setLocale } = await import(
-      pathToFileURL(join(ROOT, "bin", "cli", "i18n.mjs")).href
-    );
+    const { setLocale } = await import(pathToFileURL(join(ROOT, "bin", "cli", "i18n.mjs")).href);
     setLocale(chosen);
   }
 }
@@ -241,7 +240,15 @@ process.on("exit", () => {
   const outputIdx = process.argv.indexOf("--output");
   const outputVal = outputIdx >= 0 ? process.argv[outputIdx + 1] : null;
   if (outputVal === "json" || outputVal === "jsonl" || outputVal === "csv") return;
-  if (process.argv.some((a) => a.startsWith("--output=json") || a.startsWith("--output=jsonl") || a.startsWith("--output=csv"))) return;
+  if (
+    process.argv.some(
+      (a) =>
+        a.startsWith("--output=json") ||
+        a.startsWith("--output=jsonl") ||
+        a.startsWith("--output=csv")
+    )
+  )
+    return;
   if (_notifier.update) {
     _notifier.notify({
       defer: false,
