@@ -64,7 +64,7 @@ export async function GET(request: Request) {
   if (!isFeatureFlagEnabled("RADAR_ENABLED")) {
     return NextResponse.json(buildErrorBody(404, "Not found"), {
       status: 404,
-      headers: CORS_HEADERS,
+      headers: { ...CORS_HEADERS, "Cache-Control": "no-store" },
     });
   }
 
