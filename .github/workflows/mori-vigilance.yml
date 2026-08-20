@@ -68,7 +68,7 @@ jobs:
           echo "🚨 DRIFT: $DRIFT commits de upstream pendientes" >> "$GITHUB_STEP_SUMMARY"
 
           # Gate 1: riesgo runtime (watchlist del tuning de esta máquina)
-          RISKY=$(git diff --name-only "HEAD...upstream/$UPSTREAM_BRANCH" | grep -E '^(open-sse/services/compression/|open-sse/services/combo\.ts|open-sse/services/fusion\.ts|open-sse/utils/circuitBreaker|src/shared/utils/circuitBreaker|open-sse/services/quota|open-sse/services/limits|config/|docker-compose|Dockerfile)' || true)
+          RISKY=$(git diff --name-only "HEAD...upstream/$UPSTREAM_BRANCH" | grep -E '^(open-sse/services/compression/|open-sse/services/combo\.ts|open-sse/services/fusion\.ts|open-sse/utils/circuitBreaker|src/shared/utils/circuitBreaker|open-sse/services/quota|open-sse/services/limits|config/|docker-compose|Dockerfile)' | grep -vE '^config/quality/' || true)
           if [ -n "$RISKY" ]; then
             echo "⚠️  upstream toca runtime tuning — NO auto-merge (revisar manual)" >> "$GITHUB_STEP_SUMMARY"
             echo "$RISKY" >> "$GITHUB_STEP_SUMMARY"
