@@ -613,30 +613,32 @@ focused checks, and use a Conventional Commit message (for example, `docs: slim 
 
 ---
 
-## Fork maintenance (workflow de Mori)
+## Fork maintenance (workflow de Mori, SOLO-REMOTO)
 
 Este checkout es el fork **personal** de seguimiento de
-`diegosouzapw/omniroute` en la branch `release/v3.8.50`. Reglas que ningún
-agente debe olvidar (ver skill `omniroute-fork-workflow` para el detalle):
+`diegosouzapw/omniroute` en la branch `release/v3.8.50`.
 
-- **NO compilar local.** El build/compile se hace en CI (GitHub Actions). Para
-  saber si compila, mirar el run de CI. El artefacto compilado se **descarga**
-  desde los runs de CI (`mori-vigilance` sube `omniroute-build-secure`).
-- **Merge de upstream manual** (nunca automático), con backup y commit
-  `--no-verify` (los hooks husky del proyecto son lentos y reformatean
-  upstream). Los conflictos de sync puro se resuelven tomando upstream
-  (`git checkout --theirs <file>`).
+**NO hay checkout local** (2026-08-20): los agentes trabajan **solo contra el
+remoto** `MoriNo23/omniroute` (vía `gh` o clones efímeros en `/tmp`). El merge
+de upstream es automático en CI. Reglas:
+
+- **NO compilar local.** El build/compile se hace en CI (GitHub Actions). El
+  artefacto compilado se **descarga** desde los runs de CI (`Build App` sube
+  `omniroute-build`; `mori-vigilance` sube `omniroute-build-secure`).
+- **Merge de upstream automático** en `mori-vigilance.yml` (job `drift`), con
+  gates: toca runtime tuning (watchlist) o hay conflictos → NO mergea, badge
+  roja y aviso. Si mergea, despacha `Build App` + `mori-vigilance`.
 - **Runtime tuning protegido** (poca RAM/swap): cambios de upstream en
   `open-sse/services/compression/`, `combo.ts`, `fusion.ts`, `circuitBreaker*`,
   `quota`, `limits`, `config/`, `docker-compose*`, `Dockerfile`, o en keys como
   `QUOTA_STORE_DRIVER`, `DISABLE_SQLITE_AUTO_BACKUP`, `INSPECTOR_*` pueden
-  degradar el runtime en esta máquina sin error visible.
-- **Vigilancia**: `.github/workflows/mori-vigilance.yml` (7 categorías: drift,
-  build-release, health, security, merge-conflicts, upstream-issues,
-  runtime-risk). Notifica + reporta; abre issue si algo está en rojo.
-- Helper local:
+  degradar el runtime en esta máquina sin error visible — por eso el auto-merge
+  se saltea y pide revisión.
+- **Editar el remoto**: nunca se edita el fork a mano. Para cambios
+  (AGENTS.md, workflow), clon efímero en `/tmp` o `gh api`.
+- Helper local (status/risk/report vía API):
   `python3 ~/.hermes/skills/development/omniroute-fork-workflow/scripts/omniroute_fork.py`
-  (`status`, `risk`, `merge-check`, `merge --apply`, `report`).
+  (`status`, `risk`, `merge-check`, `report`).
 
 ---
 
