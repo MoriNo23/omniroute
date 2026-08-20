@@ -1,0 +1,256 @@
+name: mori-vigilance
+
+# Vigilancia categorizada del fork omniroute (MoriNo23) para Mori.
+# Un solo workflow, 7 jobs = 7 categorías. Cada job checa una cosa y reporta
+# en el step summary. Un job final agrega todo y abre/actualiza un issue si
+# algo queda en rojo. NUNCA toca el código del fork (el merge es manual, con
+# el skill omniroute-fork-workflow).
+#
+# Categorías: drift, build-release, health, security, merge-conflicts,
+#             upstream-issues, runtime-risk.
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # cada 6h
+  workflow_dispatch:
+  push:
+    branches: [release/v3.8.50]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: mori-vigilance
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REMOTE: https://github.com/diegosouzapw/omniroute.git
+  UPSTREAM_BRANCH: release/v3.8.50
+  FORK_REPO: MoriNo23/omniroute
+  UPSTREAM_REPO: diegosouzapw/omniroute
+
+jobs:
+  # ── Categoría 1: drift vs upstream ────────────────────────────────────────
+  drift:
+    runs-on: ubuntu-latest
+    outputs:
+      drift: ${{ steps.drift.outputs.drift }}
+      needs_merge: ${{ steps.drift.outputs.needs_merge }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: fetch upstream
+        run: |
+          git remote add upstream "$UPSTREAM_REMOTE"
+          git fetch --quiet upstream "$UPSTREAM_BRANCH"
+      - name: compute drift
+        id: drift
+        run: |
+          DRIFT=$(git rev-list --count "HEAD..upstream/$UPSTREAM_BRANCH")
+          echo "drift=$DRIFT" >> "$GITHUB_OUTPUT"
+          if [ "$DRIFT" -gt 0 ]; then
+            echo "needs_merge=true" >> "$GITHUB_OUTPUT"
+            echo "🚨 DRIFT: $DRIFT commits de upstream pendientes de merge" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "needs_merge=false" >> "$GITHUB_OUTPUT"
+            echo "✅ drift: al día ($DRIFT)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # ── Categoría 2: build + artefacto descargable ───────────────────────────
+  build-release:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: install deps
+        run: npm ci || npm install
+      - name: build (perfil minimal/secure)
+        run: npm run build:secure
+      - name: upload artefacto compilado
+        uses: actions/upload-artifact@v4
+        with:
+          name: omniroute-build-secure
+          path: .build/
+          if-no-files-found: error
+          retention-days: 14
+      - name: notify ok
+        if: success()
+        run: 'echo "✅ build: artefacto subido (omniroute-build-secure)" >> "$GITHUB_STEP_SUMMARY"'
+
+  # ── Categoría 3: salud del CI del fork ────────────────────────────────────
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: runs recientes del CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run list --limit 8 --json name,status,conclusion,createdAt \
+            | python3 -c "
+          import json,sys
+          runs=json.load(sys.stdin)
+          fails=[r for r in runs if r.get('conclusion')=='failure']
+          for r in runs:
+            print(f\"- {r['name']}: {r['conclusion'] or 'running'} ({r['createdAt'][:10]})\")
+          print('FAILS=' + str(len(fails)))
+          " | tee /tmp/health.txt
+          FAILS=$(grep '^FAILS=' /tmp/health.txt | cut -d= -f2)
+          echo "fails=$FAILS" >> "$GITHUB_ENV"
+          if [ "$FAILS" -gt 0 ]; then
+            echo "🚨 CI: $FAILS run(s) reciente(s) en FAILURE" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "✅ CI: todos los runs recientes verdes" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # ── Categoría 4: security (dependencias vulnerables) ─────────────────────
+  security:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: npm audit
+        run: |
+          npm audit --json > /tmp/audit.json 2>/dev/null || true
+          python3 -c "
+          import json
+          try:
+            d=json.load(open('/tmp/audit.json'))
+            vulns=d.get('metadata',{}).get('vulnerabilities',{})
+            total=sum(vulns.values())
+            print(f'VULNS={total}')
+            for k,v in vulns.items():
+              if v: print(f'  {k}: {v}')
+          except Exception:
+            print('VULNS=0')
+          " | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # ── Categoría 5: conflictos de merge (dry-run, no toca el repo) ──────────
+  merge-conflicts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: dry-run merge-tree
+        run: |
+          git remote add upstream "$UPSTREAM_REMOTE"
+          git fetch --quiet upstream "$UPSTREAM_BRANCH"
+          BASE=$(git merge-base HEAD "upstream/$UPSTREAM_BRANCH")
+          git merge-tree "$BASE" HEAD "upstream/$UPSTREAM_BRANCH" > /tmp/mt.txt || true
+          if grep -q "CONFLICT" /tmp/mt.txt; then
+            echo "🚨 merge: HABRÍA CONFLICTOS con upstream" >> "$GITHUB_STEP_SUMMARY"
+            grep "CONFLICT" /tmp/mt.txt | head -10 >> "$GITHUB_STEP_SUMMARY"
+            echo "conflicts=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "✅ merge: sin conflictos (dry-run)" >> "$GITHUB_STEP_SUMMARY"
+            echo "conflicts=false" >> "$GITHUB_OUTPUT"
+          fi
+    outputs:
+      conflicts: ${{ steps.merge-conflicts.outputs.conflicts }}
+
+  # ── Categoría 6: issues nuevos/abiertos del upstream ─────────────────────
+  upstream-issues:
+    runs-on: ubuntu-latest
+    steps:
+      - name: issues abiertos recientes del upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method GET "repos/$UPSTREAM_REPO/issues?state=open&sort=created&per_page=8" \
+            | python3 -c "
+          import json,sys
+          issues=[i for i in json.load(sys.stdin) if 'pull_request' not in i]
+          print(f'📌 issues abiertos upstream: {len(issues)} (8 mas recientes)')
+          for i in issues[:5]:
+            print(f\"- #{i['number']} {i['title']} ({i['created_at'][:10]})\")
+          " >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Categoría 7: riesgo al runtime tuning local (poca RAM/swap) ──────────
+  runtime-risk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: cambios upstream en areas del runtime tuning
+        run: |
+          git remote add upstream "$UPSTREAM_REMOTE"
+          git fetch --quiet upstream "$UPSTREAM_BRANCH"
+          CHANGED=$(git diff --name-only "HEAD...upstream/$UPSTREAM_BRANCH")
+          RISKY=0
+          while IFS= read -r f; do
+            for p in open-sse/services/compression/ open-sse/services/combo.ts \
+                     open-sse/services/fusion.ts open-sse/utils/circuitBreaker \
+                     open-sse/services/quota open-sse/services/limits \
+                     src/shared/utils/circuitBreaker config/ docker-compose Dockerfile; do
+              case "$f" in
+                "$p"*) echo "  ⚠️ $f"; RISKY=1 ;;
+              esac
+            done
+          done <<< "$CHANGED"
+          if [ "$RISKY" -eq 1 ]; then
+            echo "🚨 runtime-risk: cambios upstream tocan areas del runtime tuning local" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "✅ runtime-risk: sin cambios en areas del runtime tuning" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "risky=$RISKY" >> "$GITHUB_OUTPUT"
+    outputs:
+      risky: ${{ steps.runtime-risk.outputs.risky }}
+
+  # ── Resumen + notificación (issue si algo en rojo) ───────────────────────
+  report:
+    runs-on: ubuntu-latest
+    needs: [drift, health, merge-conflicts, runtime-risk]
+    if: always()
+    steps:
+      - name: resumen agregado
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NEEDS_MERGE="${{ needs.drift.outputs.needs_merge }}"
+          CONFLICTS="${{ needs.merge-conflicts.outputs.conflicts }}"
+          RISKY="${{ needs.runtime-risk.outputs.risky }}"
+          echo "## 📊 Resumen mori-vigilance" >> "$GITHUB_STEP_SUMMARY"
+          echo "- drift: $NEEDS_MERGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- merge-conflicts: $CONFLICTS" >> "$GITHUB_STEP_SUMMARY"
+          echo "- runtime-risk: $RISKY" >> "$GITHUB_STEP_SUMMARY"
+          RED=false
+          if [ "$NEEDS_MERGE" = "true" ]; then RED=true; fi
+          if [ "$CONFLICTS" = "true" ]; then RED=true; fi
+          if [ "$RISKY" = "true" ]; then RED=true; fi
+          echo "RED=$RED" >> "$GITHUB_ENV"
+          if [ "$RED" = "true" ]; then
+            cat > /tmp/body.md <<'EOM'
+            🚨 Detectado por mori-vigilance $(date -u +%Y-%m-%dT%H:%MZ).
+
+            - drift pendiente: NEEDS_MERGE
+            - conflictos de merge: CONFLICTS
+            - riesgo runtime local: RISKY
+
+            Merge manual con el skill:
+            python3 ~/.hermes/skills/development/omniroute-fork-workflow/scripts/omniroute_fork.py merge --apply
+
+            Run: https://github.com/FORK_REPO/actions/runs/RUN_ID
+            EOM
+            sed -i "s/NEEDS_MERGE/$NEEDS_MERGE/; s/CONFLICTS/$CONFLICTS/; s/RISKY/$RISKY/" /tmp/body.md
+            TITLE="🚨 omniroute fork: algo en rojo (mori-vigilance)"
+            gh api --method GET "repos/$FORK_REPO/issues?state=open&labels=vigilance" > /tmp/issues.json || true
+            EXISTING=$(python3 -c 'import json; d=json.load(open("/tmp/issues.json")); print(next((i["number"] for i in d if i["title"]=="'$TITLE'"), ""))' 2>/dev/null || true)
+            if [ -n "$EXISTING" ]; then
+              gh api --method POST "repos/$FORK_REPO/issues/$EXISTING/comments" -f body="Re-detectado $(date -u +%Y-%m-%dT%H:%MZ)" >/dev/null
+            else
+              gh api --method POST "repos/$FORK_REPO/issues" -f title="$TITLE" -f body=@/tmp/body.md -f labels=vigilance >/dev/null
+            fi
+            exit 1
+          fi
+          echo "✅ todo verde" >> "$GITHUB_STEP_SUMMARY"

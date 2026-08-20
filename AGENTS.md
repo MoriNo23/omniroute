@@ -613,6 +613,33 @@ focused checks, and use a Conventional Commit message (for example, `docs: slim 
 
 ---
 
+## Fork maintenance (workflow de Mori)
+
+Este checkout es el fork **personal** de seguimiento de
+`diegosouzapw/omniroute` en la branch `release/v3.8.50`. Reglas que ningún
+agente debe olvidar (ver skill `omniroute-fork-workflow` para el detalle):
+
+- **NO compilar local.** El build/compile se hace en CI (GitHub Actions). Para
+  saber si compila, mirar el run de CI. El artefacto compilado se **descarga**
+  desde los runs de CI (`mori-vigilance` sube `omniroute-build-secure`).
+- **Merge de upstream manual** (nunca automático), con backup y commit
+  `--no-verify` (los hooks husky del proyecto son lentos y reformatean
+  upstream). Los conflictos de sync puro se resuelven tomando upstream
+  (`git checkout --theirs <file>`).
+- **Runtime tuning protegido** (poca RAM/swap): cambios de upstream en
+  `open-sse/services/compression/`, `combo.ts`, `fusion.ts`, `circuitBreaker*`,
+  `quota`, `limits`, `config/`, `docker-compose*`, `Dockerfile`, o en keys como
+  `QUOTA_STORE_DRIVER`, `DISABLE_SQLITE_AUTO_BACKUP`, `INSPECTOR_*` pueden
+  degradar el runtime en esta máquina sin error visible.
+- **Vigilancia**: `.github/workflows/mori-vigilance.yml` (7 categorías: drift,
+  build-release, health, security, merge-conflicts, upstream-issues,
+  runtime-risk). Notifica + reporta; abre issue si algo está en rojo.
+- Helper local:
+  `python3 ~/.hermes/skills/development/omniroute-fork-workflow/scripts/omniroute_fork.py`
+  (`status`, `risk`, `merge-check`, `merge --apply`, `report`).
+
+---
+
 ## Environment
 
 - **Runtime**: Node.js ≥22.0.0 <23 || ≥24.0.0 <27, ES Modules. This is the **only supported** runtime for the published `omniroute` CLI, the server, and the test suites (`node:test` + vitest) — `engines.node` is authoritative and end users never need Bun. A **best-effort `bun:sqlite` compatibility path** exists so a global Bun install (`bun install -g omniroute`) can start without `better-sqlite3` (driver adapter + Bun-aware process spawning); it is **not** a supported runtime — no support guarantees — and every Bun-specific runtime change MUST preserve the Node driver/fallback chain and ship a Bun test (`test:bun:db`) or an explicit reason why the path is Node-only.
