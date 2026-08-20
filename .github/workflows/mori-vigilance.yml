@@ -100,8 +100,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh workflow run build.yml --ref release/v3.8.50
-          gh workflow run mori-vigilance.yml --ref release/v3.8.50
+          gh workflow run build.yml -R "$FORK_REPO" --ref release/v3.8.50
+          gh workflow run mori-vigilance.yml -R "$FORK_REPO" --ref release/v3.8.50
           echo "disparados build.yml + mori-vigilance.yml sobre el HEAD mergeado" >> "$GITHUB_STEP_SUMMARY"
 
   # ── Categoría 2: build + artefacto descargable ───────────────────────────
