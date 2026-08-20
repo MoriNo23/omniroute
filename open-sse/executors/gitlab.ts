@@ -208,9 +208,7 @@ function buildToolExchangePrompt(messages: OpenAIMessage[]): string {
     const line = renderConversationTurn(message, role, text);
     if (line) convo.push(line);
   }
-  const header = systemParts.length
-    ? `System instructions:\n${systemParts.join("\n\n")}\n\n`
-    : "";
+  const header = systemParts.length ? `System instructions:\n${systemParts.join("\n\n")}\n\n` : "";
   const body = `${header}${convo.join(
     "\n\n"
   )}\n\nContinue the response using the tool result above; do not repeat the tool call.`.trim();
@@ -583,10 +581,20 @@ export class GitlabExecutor extends BaseExecutor {
       }
 
       if (response.status === 401) {
+        if (input.log) {
+          input.log.warn(
+            "GITLAB-DUO",
+            "direct_access exchange rejected (401); falling back to public completions endpoint"
+          );
+        }
         return {
-          target: null,
+          target: {
+            mode: "monolith",
+            url: endpoints.publicCompletionsUrl,
+            headers: buildMonolithHeaders(credentials.accessToken || null),
+          },
           credentials,
-          errorResponse: toOpenAIError(401, "GitLab Duo direct access token request was rejected"),
+          errorResponse: null,
         };
       }
 

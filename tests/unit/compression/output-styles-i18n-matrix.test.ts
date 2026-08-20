@@ -29,11 +29,7 @@ const REQUIRED_LANGUAGES = ["pt-BR"];
  * Styles that predate this guard and are still English-only.
  * Do NOT add entries here without an issue — fix the coverage instead.
  */
-const KNOWN_ENGLISH_ONLY: Record<string, string> = {
-  // 9router port that never got translated. Tracked in the compression i18n
-  // backlog; the fix is mechanical (same shape as ponytail/i-have-adhd).
-  "less-code": "pre-existing gap — English-only since the 9router port",
-};
+const KNOWN_ENGLISH_ONLY: Record<string, string> = {};
 
 /**
  * Frozen per-style coverage. The assertion is a SUPERSET check, so adding a
@@ -41,9 +37,9 @@ const KNOWN_ENGLISH_ONLY: Record<string, string> = {
  */
 const BASELINE_LANGUAGES: Record<string, string[]> = {
   // terse-prose reuses CAVEMAN_INSTRUCTION_BY_LANGUAGE (outputMode.ts), which
-  // localizes to pt-BR/ja/id — keep the two in sync when adding a language.
-  "terse-prose": ["pt-BR", "ja", "id"],
-  "less-code": [],
+  // localizes to pt-BR/ja/id/vi — keep the two in sync when adding a language.
+  "terse-prose": ["pt-BR", "ja", "id", "vi"],
+  "less-code": ["pt-BR", "vi", "ja", "id"],
   ponytail: ["pt-BR", "vi", "ja", "id"],
   "i-have-adhd": ["pt-BR", "vi", "ja", "id"],
   // locale-gated to zh: the single-language instruction IS the feature.

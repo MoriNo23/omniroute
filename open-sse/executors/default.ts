@@ -388,7 +388,12 @@ export class DefaultExecutor extends BaseExecutor {
     }
   }
 
-  buildHeaders(credentials, stream = true, clientHeaders?: Record<string, string> | null) {
+  buildHeaders(
+    credentials,
+    stream = true,
+    clientHeaders?: Record<string, string> | null,
+    model?: string | null
+  ) {
     const { headers, effectiveKey } = this.buildHeadersPreamble(credentials, stream);
 
     switch (this.provider) {
@@ -594,7 +599,15 @@ export class DefaultExecutor extends BaseExecutor {
       const clientBeta = clientHeaders["anthropic-beta"] ?? clientHeaders["Anthropic-Beta"] ?? null;
       const betaKey = Object.keys(headers).find((key) => key.toLowerCase() === "anthropic-beta");
       if (betaKey && clientBeta) {
-        headers[betaKey] = mergeClientAnthropicBeta(headers[betaKey], clientBeta);
+        headers[betaKey] = mergeClientAnthropicBeta(
+          headers[betaKey],
+          clientBeta,
+          undefined,
+          // Gate the client-negotiated context-1m beta on the RESOLVED target model:
+          // combo/fallback can route a request negotiated for a [1m] sibling onto a
+          // model that does not qualify (e.g. Haiku), which Anthropic rejects (#10119).
+          model
+        );
       }
     }
 
@@ -623,8 +636,7 @@ export class DefaultExecutor extends BaseExecutor {
 
     const record = body as Record<string, unknown>;
     const rf = record.response_format as
-      | { type?: string; json_schema?: { schema?: unknown } }
-      | undefined;
+      { type?: string; json_schema?: { schema?: unknown } } | undefined;
     if (!rf) return body;
 
     // openai-compatible-* providers accept json_object natively — only the

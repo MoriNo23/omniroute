@@ -4,21 +4,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const TEST_DATA_DIR = fs.mkdtempSync(
-  path.join(os.tmpdir(), "omniroute-repro-8841-")
-);
+const TEST_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "omniroute-repro-8841-"));
 const ORIGINAL_DATA_DIR = process.env.DATA_DIR;
 process.env.DATA_DIR = TEST_DATA_DIR;
 
-const { getResolvedModelCapabilities } = await import(
-  "../../src/lib/modelCapabilities.ts"
-);
-const { getKnownContextOverflow, handleComboChat } = await import(
-  "../../open-sse/services/combo.ts"
-);
-const { getTokenLimit } = await import(
-  "../../open-sse/services/contextManager.ts"
-);
+const { getResolvedModelCapabilities } = await import("../../src/lib/modelCapabilities.ts");
+const { getKnownContextOverflow, handleComboChat } =
+  await import("../../open-sse/services/combo.ts");
+const { getTokenLimit } = await import("../../open-sse/services/contextManager.ts");
 const core = await import("../../src/lib/db/core.ts");
 
 test.after(() => {
@@ -60,7 +53,7 @@ function upstreamContextOverflowResponse() {
       error: {
         code: "context_length_exceeded",
         message:
-          "Input exceeds the context window for opencode/north-mini-code-free: estimated 210724 input tokens, limit 200000. Reduce the prompt or route to a model with a larger context window.",
+          "Input exceeds the context window for opencode/mimo-v2.5-free: estimated 210724 input tokens, limit 200000. Reduce the prompt or route to a model with a larger context window.",
       },
     }),
     {
@@ -71,8 +64,8 @@ function upstreamContextOverflowResponse() {
 }
 
 test("#8841 advertised vs compat-filter limit agree", () => {
-  const advertised = getTokenLimit("opencode-zen", "north-mini-code-free");
-  const caps = getResolvedModelCapabilities("opencode/north-mini-code-free");
+  const advertised = getTokenLimit("opencode-zen", "mimo-v2.5-free");
+  const caps = getResolvedModelCapabilities("opencode/mimo-v2.5-free");
   assert.ok(advertised > 0);
   assert.ok(
     caps.contextWindow != null && caps.contextWindow > 0,
@@ -82,10 +75,7 @@ test("#8841 advertised vs compat-filter limit agree", () => {
 
 test("#8841 oversized request rejected up front (no dispatch)", async () => {
   const body = largeBody();
-  const pool = [
-    target("opencode/north-mini-code-free"),
-    target("opencode/hy3-free"),
-  ];
+  const pool = [target("opencode/mimo-v2.5-free"), target("opencode/hy3-free")];
 
   assert.ok(getKnownContextOverflow(pool, body), "overflow before dispatch");
 
@@ -95,10 +85,7 @@ test("#8841 oversized request rejected up front (no dispatch)", async () => {
     combo: {
       name: "pro-coding-repro-8841",
       strategy: "priority",
-      models: [
-        "opencode/north-mini-code-free",
-        "opencode/hy3-free",
-      ],
+      models: ["opencode/mimo-v2.5-free", "opencode/hy3-free"],
     },
     handleSingleModel: async () => {
       dispatches += 1;

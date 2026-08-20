@@ -47,13 +47,6 @@ const TOOL_CALLING_UNSUPPORTED_PATTERNS: string[] = [
   "stable-diffusion",
 ];
 const REASONING_UNSUPPORTED_PATTERNS = [
-  "antigravity/claude-sonnet-4-6",
-  "antigravity/claude-sonnet-4-5",
-  "antigravity/claude-sonnet-4",
-  // Non-Claude antigravity models don't support thinking params (#1361)
-  "antigravity/gemini-",
-  "antigravity/gpt-oss-",
-  "antigravity/gemini-3",
   "antigravity/tab_",
   // Specialty / non-chat surfaces (#8016)
   "whisper",
@@ -574,9 +567,15 @@ function getContextOverride(
 /**
  * Resolve a persisted context override by canonical id, then by the exact raw
  * alias supplied by the caller. Neither lookup inherits to related models.
+ *
+ * `snapshot` is the #9147 build-local bulk load; when supplied the on-demand
+ * SQLite read is skipped and the preloaded nested map is used instead.
  */
-export function getResolvedModelContextOverride(input: CapabilityInput): number | null {
-  return getContextOverride(resolveCapabilityInput(input));
+export function getResolvedModelContextOverride(
+  input: CapabilityInput,
+  snapshot?: ModelCapabilityResolutionSnapshot | null
+): number | null {
+  return getContextOverride(resolveCapabilityInput(input), snapshot);
 }
 
 function getInputTokenCapabilityOverride(resolved: {

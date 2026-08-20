@@ -93,6 +93,21 @@ test.after(() => {
 // ---------------------------------------------------------------------------
 
 test("#3500 getProviderMetrics — aggregates totals and latency per provider", () => {
+  // #10714: getProviderMetrics() only surfaces providers with a live
+  // provider_connections row — seed openai/anthropic connections so their
+  // call_logs rows are not filtered out as ghost/deleted providers.
+  const db0 = core.getDbInstance();
+  db0
+    .prepare(
+      `INSERT INTO provider_connections (id, provider, created_at, updated_at) VALUES (?, ?, ?, ?)`
+    )
+    .run("conn-3500-openai", "openai", new Date().toISOString(), new Date().toISOString());
+  db0
+    .prepare(
+      `INSERT INTO provider_connections (id, provider, created_at, updated_at) VALUES (?, ?, ?, ?)`
+    )
+    .run("conn-3500-anthropic", "anthropic", new Date().toISOString(), new Date().toISOString());
+
   // Two openai rows: one success, one error with error_summary
   const ts1 = "2025-06-01T10:00:00.000Z";
   const ts2 = "2025-06-01T11:00:00.000Z";
@@ -110,11 +125,14 @@ test("#3500 getProviderMetrics — aggregates totals and latency per provider", 
   // Provider '-' should be excluded
   insertCallLog({ provider: "-", status: 200 });
   // Provider null should be excluded (insert directly to avoid type issue)
-  core.getDbInstance().prepare(
-    `INSERT INTO call_logs (id, timestamp, method, path, status, model, provider, duration,
+  core
+    .getDbInstance()
+    .prepare(
+      `INSERT INTO call_logs (id, timestamp, method, path, status, model, provider, duration,
       tokens_in, tokens_out, cache_source, detail_state, has_request_body, has_response_body, has_pipeline_details)
      VALUES (?, ?, 'POST', '/v1/test', 200, 'x', NULL, 100, 0, 0, 'upstream', 'none', 0, 0, 0)`
-  ).run(`log-3500-null-${++_idSeq}`, new Date().toISOString());
+    )
+    .run(`log-3500-null-${++_idSeq}`, new Date().toISOString());
 
   const rows = mod.getProviderMetrics();
 
@@ -202,12 +220,36 @@ test("#3500 getSearchAggregateStats — correct totals, today, errors, avg, cach
   // Rows inserted after todayStart qualify as "today"
   const nowIso = new Date().toISOString();
   // duration=0 → excluded from avg_duration; duration=3 → cached (>0 && <5)
-  insertCallLog({ provider: "brave", status: 200, duration: 100, request_type: "search", timestamp: nowIso });
-  insertCallLog({ provider: "brave", status: 200, duration: 3, request_type: "search", timestamp: nowIso });
-  insertCallLog({ provider: "brave", status: 500, duration: 80, request_type: "search", timestamp: nowIso });
+  insertCallLog({
+    provider: "brave",
+    status: 200,
+    duration: 100,
+    request_type: "search",
+    timestamp: nowIso,
+  });
+  insertCallLog({
+    provider: "brave",
+    status: 200,
+    duration: 3,
+    request_type: "search",
+    timestamp: nowIso,
+  });
+  insertCallLog({
+    provider: "brave",
+    status: 500,
+    duration: 80,
+    request_type: "search",
+    timestamp: nowIso,
+  });
   // Old row (yesterday) — not in today count
   const yesterday = new Date(Date.now() - 86_400_000).toISOString();
-  insertCallLog({ provider: "brave", status: 200, duration: 200, request_type: "search", timestamp: yesterday });
+  insertCallLog({
+    provider: "brave",
+    status: 200,
+    duration: 200,
+    request_type: "search",
+    timestamp: yesterday,
+  });
 
   const result = mod.getSearchAggregateStats(todayIso);
 

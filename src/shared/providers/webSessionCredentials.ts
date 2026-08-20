@@ -356,8 +356,7 @@ export const WEB_SESSION_CREDENTIAL_REQUIREMENTS = {
   "conol-web": {
     kind: "cookie",
     credentialName: "__Secure-better-auth.session_token",
-    placeholder:
-      "__Secure-better-auth.session_token=... or full Cookie header from conol.ai",
+    placeholder: "__Secure-better-auth.session_token=... or full Cookie header from conol.ai",
     acceptsFullCookieHeader: true,
     storageKeys: ["cookie", "__Secure-better-auth.session_token"],
   },
@@ -373,6 +372,12 @@ export function getWebSessionCredentialRequirement(
       providerId as keyof typeof WEB_SESSION_CREDENTIAL_REQUIREMENTS
     ] ?? null
   );
+}
+
+export function canUpdateProviderApiKey(authType: unknown, providerId: unknown): boolean {
+  if (authType === "apikey") return true;
+  if (authType !== "cookie") return false;
+  return getWebSessionCredentialRequirement(providerId)?.kind === "token";
 }
 
 export function requiresWebSessionCredential(providerId: unknown): boolean {

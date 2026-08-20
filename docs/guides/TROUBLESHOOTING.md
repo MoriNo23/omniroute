@@ -62,7 +62,7 @@ Set these in the OmniRoute process environment (the daemon, e.g. via the LaunchA
 
 **How to verify it worked**: run your agent/cron twice in quick succession and confirm both succeed. Before the fix, the second run typically throws `429`/`401`. After the fix, failures (if any) are retried transparently and the call completes. You can also `curl /monitoring/health` and watch the `rateLimitedUntil` field on the provider connections and the `circuitBreakers.providerBreakers[].state` for the affected providers — the state is one of `CLOSED`, `DEGRADED`, `OPEN`, or `HALF_OPEN` (see `src/shared/utils/circuitBreaker.ts`), and a provider that keeps failing will flip `CLOSED → DEGRADED → OPEN` before the reset window lets a probe through (`HALF_OPEN`).
 
-**If you still see 429**: the active account for that provider has genuinely exhausted its *quota* (not just rate). Add a second account for the same provider in the OmniRoute dashboard → Providers → Accounts, or mix in another free provider (e.g. `routeway`, `auggie`). Rotation only helps with transient rate/400/401; a hard quota exhaustion requires a second credential or a different provider.
+**If you still see 429**: the active account for that provider has genuinely exhausted its _quota_ (not just rate). Add a second account for the same provider in the OmniRoute dashboard → Providers → Accounts, or mix in another free provider (e.g. `routeway`, `auggie`). Rotation only helps with transient rate/400/401; a hard quota exhaustion requires a second credential or a different provider.
 
 **If you see 403 on vision models (`auto/vision`, `bazaarlink/*`)**: the connected account lacks a paid plan that includes vision, or the API key has insufficient permissions. Verify in the provider dashboard that the key scope includes vision/multimodal, or connect a paid tier account and keep it as the vision target.
 
@@ -478,7 +478,7 @@ If a provider repeatedly enters OPEN state:
 
 ### "Unsupported model" error
 
-- Ensure you're using the correct prefix: `deepgram/nova-3` or `assemblyai/best`
+- Use a model id whose first segment is a provider you have credentials for (`openai/whisper-1`, `openrouter/deepgram/nova-3`). Bare `deepgram/nova-3` requires a native Deepgram key.
 - Verify the provider is connected in **Dashboard → Providers**
 
 ### Transcription returns empty or fails

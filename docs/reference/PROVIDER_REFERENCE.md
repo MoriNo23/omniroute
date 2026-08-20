@@ -1,16 +1,16 @@
 ---
 title: "Provider Reference"
 version: 3.8.50
-lastUpdated: 2026-08-15
+lastUpdated: 2026-08-19
 ---
 
 # Provider Reference
 
 > **Auto-generated** from `src/shared/constants/providers.ts` — do not edit by hand.
 > Regenerate with: `npm run gen:provider-reference`
-> **Last generated:** 2026-08-15
+> **Last generated:** 2026-08-19
 
-Total providers: **340**. See category breakdown below.
+Total providers: **342**. See category breakdown below.
 
 ## Categories
 
@@ -34,20 +34,21 @@ Use the dashboard at `/dashboard/providers` to enable, configure, and test each 
 
 ---
 
-## No-auth Providers (no key required) (10)
+## No-auth Providers (no key required) (11)
 
 | ID | Alias | Name | Tags | Website | Notes | Tool calling |
 |----|-------|------|------|---------|-------|--------------|
 | `aihorde` | `horde` | AI Horde | No-auth | [link](https://aihorde.net) | No API key required — uses AI Horde's documented anonymous key. Adding a free aihorde.net key is optional and only buys higher queue priority (kudos). | — |
 | `auggie` | `aug` | Augment (Auggie CLI) | No-auth | [link](https://augmentcode.com) | No API key stored by OmniRoute. Install the Auggie CLI and run `auggie login` on this machine, then OmniRoute spawns it locally for each request. | — |
 | `chipotle` | `pepper` | Chipotle Pepper AI (Free) | No-auth | [link](https://amelia.chipotle.com) | No credentials required. Uses Chipotle's public support chatbot via reverse-engineered SockJS/STOMP protocol. | — |
+| `cloudflare-playground` | `cfp` | Cloudflare AI Playground | No-auth | [link](https://playground.ai.cloudflare.com) | No credentials required — anonymous browser sessions over a reverse-engineered cf_agent WebSocket protocol (Playwright transport). | — |
 | `devin-cli-agentic` | `dva` | Devin CLI Agentic Bridge | No-auth | [link](https://docs.devin.ai/work-with-devin/devin-cli) | Authentication is owned by the official Devin CLI in its isolated bridge volume. | emulated |
 | `duckduckgo-web` | `ddgw` | DuckDuckGo AI Chat | No-auth | [link](https://duckduckgo.com/duckchat) | No credentials required — DuckDuckGo AI Chat is anonymous and free. | emulated |
 | `felo-web` | `felo` | Felo | No-auth | [link](https://felo.ai) | No credentials required — Felo is a free, no-signup chat/search aggregator. | — |
-| `mimocode` | `mcode` | MiMoCode (Free) | No-auth | [link](https://mimo.mi.com) | No API key required. The executor auto-generates JWT tokens via device fingerprint bootstrap. | — |
 | `opencode` | `oc` | OpenCode Free | No-auth | [link](https://opencode.ai) | No API key required — uses OpenCode's public free endpoint. | — |
 | `theoldllm` | `tllm` | The Old LLM (Free) | No-auth | [link](https://theoldllm.vercel.app) | No credentials required. The executor auto-generates access tokens via an embedded Playwright browser instance. | — |
 | `veoaifree-web` | `veo-free` | Veo AI Free | No-auth, video | [link](https://veoaifree.com) | No auth required. Rate limited to 6 requests/hour per IP. | — |
+| `zcode` | `zc` | ZCode (GLM Coding Plan) | No-auth | [link](https://zcode.z.ai) | No API key stored by OmniRoute. The local ZCode app-server uses the existing builtin:zai-coding-plan login. | — |
 
 ## OAuth Providers (25)
 
@@ -90,7 +91,7 @@ Use the dashboard at `/dashboard/providers` to enable, configure, and test each 
 | `chatgpt-web-codex` | `cgpt-codex` | ChatGPT Web (Codex) | Web cookie | [link](https://chatgpt.com) | Paste the full ChatGPT Cookie header. OmniRoute verifies it in an isolated headless browser profile. | native |
 | `claude-web` | `cw` | Claude Web | Web cookie | [link](https://claude.ai) | Paste your session cookie from claude.ai | none |
 | `conol-web` | `cnl` | Conol (Unofficial/Experimental) | Web cookie | [link](https://conol.ai) | Use browser sign-in, or paste the full Cookie header from conol.ai. The __Secure-better-auth.session_token cookie is required. | — |
-| `copilot-m365-web` | `m365copilot` | Microsoft 365 Copilot (BizChat) | Web cookie | [link](https://m365.cloud.microsoft/chat) | Sign in at m365.cloud.microsoft/chat, then open DevTools → Network → filter 'WS' → click the Chathub WebSocket connection. Copy both the access_token query parameter AND the account-specific Chathub path segment from its request URL (wss://…/Chathub/<path>?…&access_token=…). It is NOT an Authorization: Bearer header on an XHR/Fetch request. The token is short-lived; this is an unofficial integration. | — |
+| `copilot-m365-web` | `m365copilot` | Microsoft 365 Copilot (BizChat) | Web cookie | [link](https://m365.cloud.microsoft/chat) | Sign in at m365.cloud.microsoft/chat, then open DevTools → Network → filter 'WS' → click the Chathub WebSocket connection. Copy both the access_token query parameter AND the account-specific Chathub path segment from its request URL (wss://…/Chathub/<path>?…&access_token=…). It is NOT an Authorization: Bearer header on an XHR/Fetch request. The token is short-lived; this is an unofficial integration. Optional: store a refresh_token in providerSpecificData.refreshToken (any Microsoft device-code/refresh flow for the substrate.office.com/sydney scopes) and OmniRoute pre-flight-refreshes the access token itself — otherwise re-capture after every ~75 min expiry. | — |
 | `copilot-web` | `copilot` | Microsoft Copilot Web | Web cookie | [link](https://copilot.microsoft.com) | Paste the access_token from an authenticated copilot.microsoft.com request (DevTools → Network → Authorization), or export a HAR while logged in | — |
 | `deepseek-web` | `ds-web` | DeepSeek Web | Web cookie | [link](https://chat.deepseek.com) | Paste your userToken from chat.deepseek.com — DevTools → Application → Local Storage → userToken | emulated |
 | `doubao-web` | `db` | Dola Web (ByteDance) | Web cookie | [link](https://www.dola.com) | Paste the full Cookie header from www.dola.com. It should include sessionid, ttwid, and s_v_web_id. If s_v_web_id is unavailable, fp=verify_... from a chat/completion request URL can be used as a fallback. | — |
@@ -119,7 +120,7 @@ Use the dashboard at `/dashboard/providers` to enable, configure, and test each 
 | `zai-web` | `zw` | Z.ai Web | Web cookie | [link](https://chat.z.ai) | Copy the "token" value from chat.z.ai → DevTools → Application → Local Storage. Do not copy cookies; OmniRoute handles the per-request CAPTCHA through its browser transport. | — |
 | `zenmux-free` | `zmf` | ZenMux Free (Web) | Web cookie | [link](https://zenmux.ai) | Login at zenmux.ai, then export all cookies using EditThisCookie or Cookie-Editor and paste the full Cookie header string here. Refresh every ~30 days. | — |
 
-## API Key Providers (paid / paid-with-free-credits) (228)
+## API Key Providers (paid / paid-with-free-credits) (229)
 
 | ID | Alias | Name | Tags | Website | Notes |
 |----|-------|------|------|---------|-------|
@@ -168,6 +169,7 @@ Use the dashboard at `/dashboard/providers` to enable, configure, and test each 
 | `command-code` | `cmd` | Command Code | API key | [link](https://commandcode.ai/) | Use a Command Code API key. Requests are sent to Command Code's /alpha/generate endpoint. |
 | `coze` | `coze` | Coze | API key | [link](https://coze.com) | Get API key at coze.com/open/api |
 | `crof` | `crof` | CrofAI | API key | [link](https://crof.ai) | — |
+| `cursor-api` | `cua` | Cursor API | API key | [link](https://cursor.com/dashboard/api) | Paste a Cursor user API key (crsr_...) from cursor.com/dashboard/api. OmniRoute exchanges it for a session token on demand; no IDE or cursor-agent install is needed. Usage bills to the Cursor plan that owns the key. |
 | `dahl` | `dahl` | Dahl | API key | [link](https://inference.dahl.global) | Click 'Add Account' to auto-generate a token, or add a manual API key. |
 | `databricks` | `databricks` | Databricks | API key, enterprise | [link](https://www.databricks.com) | — |
 | `datarobot` | `datarobot` | DataRobot | API key, enterprise | [link](https://docs.datarobot.com) | Use your DataRobot API token. Optional Base URL can be the account root (for LLM Gateway) or a deployment URL under /api/v2/deployments/<id>. |
@@ -224,8 +226,8 @@ Use the dashboard at `/dashboard/providers` to enable, configure, and test each 
 | `inception` | `inception` | Inception | API key | [link](https://docs.inceptionlabs.ai) | 10M free tokens on signup, no credit card required. |
 | `inference-net` | `inet` | Inference.net | API key | [link](https://inference.net) | $25 free credits on signup plus research grants available |
 | `internlm` | `internlm` | InternLM (Intern-S1) | API key | [link](https://internlm.intern-ai.org.cn/) | Free monthly quota ~1M input / 3M output tokens (~10 RPM) |
-| `jina-ai` | `jina` | Jina AI | API key, embed/rerank | [link](https://jina.ai) | Bearer API key for the Jina AI rerank API. |
-| `jina-reader` | `jr` | Jina Reader | API key | [link](https://jina.ai/reader) | — |
+| `jina-ai` | `jina` | Jina AI (Foundation API) | API key, embed/rerank | [link](https://jina.ai) | Bearer API key for api.jina.ai — embeddings, rerank, classify, segment, and search. Dashboard keys take precedence over JINA_AI_API_KEY. This is not the Reader / r.jina.ai card and does not fetch URLs. |
+| `jina-reader` | `jr` | Jina Reader (r.jina.ai) | API key | [link](https://jina.ai/reader) | Bearer API key for r.jina.ai URL-to-markdown (/v1/web/fetch only). Does not serve /v1/embeddings or /v1/rerank. The same Jina token as Foundation API works; OmniRoute reuses a jina-ai dashboard key or JINA_AI_API_KEY when this card is empty. |
 | `kenari` | `kenari` | Kenari | API key | [link](https://kenari.id) | Use your Kenari API key (kn-...) in Authorization: Bearer <key>. Fully OpenAI-compatible. API base URL: https://kenari.id/v1. |
 | `kie` | `kie` | KIE.AI | API key | [link](https://kie.ai) | — |
 | `kilo-gateway` | `kg` | Kilo Gateway | API key, aggregator | [link](https://kilo.ai) | — |
@@ -322,7 +324,8 @@ Use the dashboard at `/dashboard/providers` to enable, configure, and test each 
 | `tinyfish` | `tf` | TinyFish Fetch | API key | [link](https://docs.tinyfish.ai/fetch-api) | X-API-Key from agent.tinyfish.ai/api-keys |
 | `together` | `together` | Together AI | API key, video | [link](https://www.together.ai) | — |
 | `tokenreply` | `tokenreply` | TokenReply | API key, aggregator | [link](https://www.tokenreply.com) | Free-tagged models have model- and campaign-specific daily limits; no fixed global free quota is published. |
-| `tokenrouter` | `trk` | TokenRouter | API key | [link](https://tokenrouter.com) | Use your TokenRouter API key in Authorization: Bearer <key>. Fully OpenAI-compatible. API base URL: https://api.tokenrouter.com/v1. |
+| `tokenrouter` | `trk` | TokenRouter | API key | [link](https://tokenrouter.com) | Use your TokenRouter API key in Authorization: Bearer *** Fully OpenAI-compatible. API base URL: https://api.tokenrouter.com/v1. |
+| `token-kiosk` | `tk` | Token Kiosk | API key | [link](https://agent-router.gaib.ai) | Use your Token Kiosk API key in Authorization: Bearer *** Fully OpenAI-compatible. API base URL: https://agent-router.gaib.ai/v1. |
 | `topaz` | `topaz` | Topaz | API key, image | [link](https://topazlabs.com) | — |
 | `typhoon` | `typhoon` | Typhoon | API key | [link](https://docs.opentyphoon.ai) | Free API key with a 5 req/s and 200 req/m rate limit. |
 | `udio` | `udio` | Udio | API key | [link](https://udio.com) | Paste session cookie from udio.com (Supabase auth) |
@@ -342,7 +345,7 @@ Use the dashboard at `/dashboard/providers` to enable, configure, and test each 
 | `watsonx` | `watsonx` | IBM watsonx.ai Gateway | API key, enterprise | [link](https://www.ibm.com/products/watsonx-ai) | Use your watsonx bearer token. Base URL can be https://<region>.ml.cloud.ibm.com/ml/gateway/v1/ or a self-managed /ml/gateway/v1 endpoint. |
 | `writer` | `writer` | Writer | API key | [link](https://dev.writer.com) | — |
 | `x5lab` | `x5lab` | X5Lab | API key | [link](https://x5lab.dev) | Use your X5Lab API key (x5-...) in Authorization: Bearer <key>. Fully OpenAI-compatible. API base URL: https://api.x5lab.dev/v1. |
-| `xai` | `xai` | xAI (Grok) | API key | [link](https://x.ai) | — |
+| `xai` | `xai` | xAI (Grok) | API key | [link](https://x.ai) | Use an official xAI API key, or sign in with xAI OAuth. Grok Build JWT sessions remain a separate provider. |
 | `xiaomi-mimo` | `mimo` | Xiaomi MiMo | API key | [link](https://mimo.mi.com) | — |
 | `xiaomi-mimo-token-plan` | `mimotp` | Xiaomi MiMo Token Plan | API key | [link](https://mimo.mi.com) | — |
 | `yi` | `yi` | Yi (01.AI) | API key | [link](https://01.ai) | Get API key at platform.lingyiwanwu.com |
@@ -428,7 +431,7 @@ Use the dashboard at `/dashboard/providers` to enable, configure, and test each 
 
 - Catalog: [`src/shared/constants/providers.ts`](../../src/shared/constants/providers.ts)
 - Registry (per-model details): [`open-sse/config/providerRegistry.ts`](../../open-sse/config/providerRegistry.ts)
-- Executors: [`open-sse/executors/`](../../open-sse/executors/) (101 implementations)
+- Executors: [`open-sse/executors/`](../../open-sse/executors/) (105 implementations)
 - Translators: [`open-sse/translator/`](../../open-sse/translator/)
 
 ## See Also

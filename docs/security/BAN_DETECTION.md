@@ -38,7 +38,7 @@ this service has been disabled in this account                  (Antigravity)
 > copy is `ACCOUNT_DEACTIVATED_SIGNALS` in `open-sse/services/accountFallback.ts`;
 > treat the block above as a snapshot.
 
-Two adjacent, **separate** signal tables live in the same file and are *not* part
+Two adjacent, **separate** signal tables live in the same file and are _not_ part
 of banned-keyword detection:
 
 - `CREDITS_EXHAUSTED_SIGNALS` — billing/quota depleted (`insufficient_quota`,
@@ -56,7 +56,10 @@ upstream error response
   → isAccountDeactivated(body): getMergedBannedSignals().some(sig => body.includes(sig))   [substring match]
   → match?
       → connection testStatus = "banned"      (permanent — 1-year cooldown, never auto-recovers)
-      → if setting `autoDisableBannedAccounts` is on → also isActive = false
+      → if setting `autoDisableBannedAccounts` is on and `autoDisableBannedScope`
+        includes this connection (`all`, or `subscription` for OAuth/cookie/session)
+        → also isActive = false. Prepaid API keys stay active when scope is
+        `subscription`.
       → connection is skipped during account selection (combo QUOTA_BLOCKING statuses)
 ```
 
@@ -67,7 +70,7 @@ upstream error response
   narrower **`deactivated`** label (`isActive=false` when the connection has no
   spare API keys) is written by the inline `chatCore.ts` path on **HTTP 401 / 403**
   (classified via `classifyProviderError` → `ACCOUNT_DEACTIVATED`). Note the
-  `markAccountUnavailable()` path writes a *different* terminal status —
+  `markAccountUnavailable()` path writes a _different_ terminal status —
   **`expired`** — for the same `ACCOUNT_DEACTIVATED` signal (via
   `resolveTerminalConnectionStatus`), so the same ban can surface as either
   `deactivated` or `expired` depending on which path handled the response. (The
@@ -83,10 +86,17 @@ every failed upstream request flows through — it is **not** gated to
 OAuth/subscription scrapers. The resulting terminal state is per **connection**,
 not per provider.
 
-That said, the built-in *strings* are oriented toward subscription/OAuth
+That said, the built-in _strings_ are oriented toward subscription/OAuth
 providers with real ban risk (ChatGPT Web, Claude Web, Codex, Muse Spark,
 Antigravity). An API-key provider will only trip the detector if its error body
 literally contains one of the substrings.
+
+`autoDisableBannedScope` (`all` | `subscription`, default `all`) controls whether
+a match also flips `isActive=false`. `subscription` means login-style seats
+(paid subscriptions and free accounts, including web-cookie sessions). It still
+records `testStatus=banned` for prepaid API keys but leaves them in the routing
+pool. The durable design is a per-provider and per-account override; the global
+enum is the first cut.
 
 ## Custom banned keywords
 
@@ -118,8 +128,9 @@ own). An operator must clear them explicitly:
    `active` and clears the error fields.
 2. **Re-authenticate / edit credentials** — for OAuth providers, re-run the login
    / refresh flow; provider create/import routes set `isActive = true`.
-3. **Re-enable the connection** — if `autoDisableBannedAccounts` set
-   `isActive = false`, toggle it back on after fixing the account.
+3. **Re-enable the connection** — if auto-disable set `isActive = false`
+   (scope `all`, or `subscription` for an OAuth/cookie/session connection),
+   toggle it back on after fixing the account.
 
 There is no separate "clear ban flag" button — recovery is re-test, re-auth, or
 re-enable, matching the general terminal-state rule in
@@ -127,11 +138,12 @@ re-enable, matching the general terminal-state rule in
 
 ## Source files
 
-| Concern | File |
-| --- | --- |
-| Signal tables + match | `open-sse/services/accountFallback.ts` |
-| Terminalization / persistence | `src/sse/services/auth.ts` (`markAccountUnavailable`, `resolveTerminalConnectionStatus`, `clearAccountError`) |
-| Inline classification | `open-sse/handlers/chatCore.ts`, `open-sse/services/errorClassifier.ts` |
-| Terminal-state recovery exclusion | `src/lib/quota/connectionRecovery.ts` |
-| Custom-keyword runtime load | `src/lib/config/runtimeSettings.ts` (`setCustomBannedSignals`) |
-| Settings UI | `src/app/(dashboard)/dashboard/settings/components/SecurityTab.tsx` |
+| Concern                           | File                                                                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Signal tables + match             | `open-sse/services/accountFallback.ts`                                                                        |
+| Terminalization / persistence     | `src/sse/services/auth.ts` (`markAccountUnavailable`, `resolveTerminalConnectionStatus`, `clearAccountError`) |
+| Auto-disable scope                | `src/shared/utils/autoDisableBanned.ts`, `src/sse/services/autoDisableBannedAccount.ts`                       |
+| Inline classification             | `open-sse/handlers/chatCore.ts`, `open-sse/services/errorClassifier.ts`                                       |
+| Terminal-state recovery exclusion | `src/lib/quota/connectionRecovery.ts`                                                                         |
+| Custom-keyword runtime load       | `src/lib/config/runtimeSettings.ts` (`setCustomBannedSignals`)                                                |
+| Settings UI                       | `src/app/(dashboard)/dashboard/settings/components/SecurityTab.tsx`                                           |

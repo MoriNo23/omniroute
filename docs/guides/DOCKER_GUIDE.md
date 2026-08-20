@@ -285,8 +285,12 @@ Next.js `basePath` is compiled into the standalone bundle. OmniRoute records the
 value in a sentinel file at the app root (written during `npm run build`; read by
 `scripts/docker/ensure-docker-base-path.mjs`) and compares it with
 `OMNIROUTE_BASE_PATH` when the container starts. When they differ and the image was
-built for the domain root, the entrypoint rewrites the standalone manifests and embedded
-`basePath` literals before `node dev/run-standalone.mjs` runs.
+built for the domain root, the entrypoint rewrites the standalone manifests, the
+embedded `basePath`/`assetPrefix` literals (Next 16 renders SSR asset URLs from
+`assetPrefix` alone — the patcher mirrors the subpath into it), the baked
+`/_next/static` asset URLs (client-reference manifests, media imports, prerendered
+error pages) and the client `process.env` shim before `node dev/run-standalone.mjs`
+runs.
 
 ### Compose build (recommended)
 
@@ -325,18 +329,21 @@ prefix). Traefik should route `PathPrefix(`/omniroute`)` to the container withou
 `StripPrefix`, so Next.js receives `/omniroute/...` and serves assets from
 `/omniroute/_next/...`.
 
-The Docker healthcheck probes `/api/monitoring/health` prefixed with the active
-`OMNIROUTE_BASE_PATH`. That path is a **deep** check (DB + monitoring summary). It is
-appropriate for Docker’s infrequent `HEALTHCHECK`, but **not** for Kubernetes
-`livenessProbe` intervals.
+The Docker healthcheck probes the lightweight `/healthz` lifecycle endpoint prefixed
+with the active `OMNIROUTE_BASE_PATH`. `/api/monitoring/health` remains available for
+human/dashboard diagnostics; to point the container HEALTHCHECK back at it (for example
+for deep health enforcement), set `OMNIROUTE_HEALTHCHECK_PATH=/api/monitoring/health`.
+That path is a **deep** check (DB + monitoring summary) — appropriate for Docker's
+infrequent `HEALTHCHECK` if you opt back in, but **not** for Kubernetes `livenessProbe`
+intervals.
 
 For orchestrators (Kubernetes, Nomad, etc.):
 
-| Probe | Prefer | Avoid |
-| --- | --- | --- |
-| Liveness | TCP on the main port (`PORT`, default `20128`), or soft HTTP `/healthz` | `/api/monitoring/health` as liveness |
-| Readiness | HTTP `GET /healthz` | Tight timeouts that treat event-loop busy as dead |
-| Deep / blackbox | `/api/monitoring/health` | — |
+| Probe           | Prefer                                                                  | Avoid                                             |
+| --------------- | ----------------------------------------------------------------------- | ------------------------------------------------- |
+| Liveness        | TCP on the main port (`PORT`, default `20128`), or soft HTTP `/healthz` | `/api/monitoring/health` as liveness              |
+| Readiness       | HTTP `GET /healthz`                                                     | Tight timeouts that treat event-loop busy as dead |
+| Deep / blackbox | `/api/monitoring/health`                                                | —                                                 |
 
 `/healthz` only reports process lifecycle (`ok` / `starting` / `stopping`). It still
 runs on the same Node event loop as request handling, so CPU-bound catalog or
