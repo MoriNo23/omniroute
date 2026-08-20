@@ -247,10 +247,13 @@ jobs:
             gh api --method GET "repos/$FORK_REPO/issues?state=open&labels=vigilance" > /tmp/issues.json || true
             EXISTING=$(python3 -c 'import json; d=json.load(open("/tmp/issues.json")); print(next((i["number"] for i in d if i["title"]=="'$TITLE'"), ""))' 2>/dev/null || true)
             if [ -n "$EXISTING" ]; then
-              gh api --method POST "repos/$FORK_REPO/issues/$EXISTING/comments" -f body="Re-detectado $(date -u +%Y-%m-%dT%H:%MZ)" >/dev/null
+              gh api --method POST "repos/$FORK_REPO/issues/$EXISTING/comments" -f body="Re-detectado $(date -u +%Y-%m-%dT%H:%MZ)" >/dev/null \
+                || echo "nota: issues deshabilitados o API rechazó el comment" >> "$GITHUB_STEP_SUMMARY"
             else
-              gh api --method POST "repos/$FORK_REPO/issues" -f title="$TITLE" -f body=@/tmp/body.md -f labels=vigilance >/dev/null
+              gh api --method POST "repos/$FORK_REPO/issues" -f title="$TITLE" -f body=@/tmp/body.md -f labels=vigilance >/dev/null \
+                || echo "nota: issues deshabilitados en el repo — aviso solo en el resumen del run" >> "$GITHUB_STEP_SUMMARY"
             fi
+            echo "Red badge: revisar el resumen de este run." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
           echo "✅ todo verde" >> "$GITHUB_STEP_SUMMARY"
