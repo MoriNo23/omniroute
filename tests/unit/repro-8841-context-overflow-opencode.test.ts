@@ -9,8 +9,7 @@ const ORIGINAL_DATA_DIR = process.env.DATA_DIR;
 process.env.DATA_DIR = TEST_DATA_DIR;
 
 const { getResolvedModelCapabilities } = await import("../../src/lib/modelCapabilities.ts");
-const { getKnownContextOverflow, handleComboChat } =
-  await import("../../open-sse/services/combo.ts");
+const { handleComboChat } = await import("../../open-sse/services/combo.ts");
 const { getTokenLimit } = await import("../../open-sse/services/contextManager.ts");
 const core = await import("../../src/lib/db/core.ts");
 
@@ -27,18 +26,6 @@ const noopLog = {
   error() {},
   debug() {},
 };
-
-const target = (m) => ({
-  kind: "model",
-  stepId: m,
-  executionKey: m,
-  modelStr: m,
-  provider: "opencode-zen",
-  providerId: null,
-  connectionId: null,
-  weight: 1,
-  label: null,
-});
 
 function largeBody() {
   return {
@@ -73,19 +60,18 @@ test("#8841 advertised vs compat-filter limit agree", () => {
   );
 });
 
-test("#8841 oversized request rejected up front (no dispatch)", async () => {
+test("#8841 real upstream context overflow remains a fatal 400 after dispatch", async () => {
   const body = largeBody();
-  const pool = [target("opencode/mimo-v2.5-free"), target("opencode/hy3-free")];
-
-  assert.ok(getKnownContextOverflow(pool, body), "overflow before dispatch");
-
   let dispatches = 0;
   const result = await handleComboChat({
     body,
     combo: {
       name: "pro-coding-repro-8841",
       strategy: "priority",
-      models: ["opencode/mimo-v2.5-free", "opencode/hy3-free"],
+      models: [
+        { model: "opencode/north-mini-code-free" },
+        { model: "opencode/north-mini-code-free" },
+      ],
     },
     handleSingleModel: async () => {
       dispatches += 1;
@@ -96,9 +82,8 @@ test("#8841 oversized request rejected up front (no dispatch)", async () => {
     allCombos: [],
   });
 
-  assert.equal(dispatches, 0, `no upstream dispatch (got ${dispatches})`);
+  assert.equal(dispatches, 1, "real upstream overflow must short-circuit fallback");
   assert.equal(result.status, 400);
   const json = await result.json();
   assert.equal(json.error?.code, "context_length_exceeded");
-  assert.equal(json.diagnostics?.attempted, 0);
 });

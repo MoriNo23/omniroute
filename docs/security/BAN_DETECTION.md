@@ -136,6 +136,54 @@ There is no separate "clear ban flag" button — recovery is re-test, re-auth, o
 re-enable, matching the general terminal-state rule in
 [RESILIENCE_GUIDE](../architecture/RESILIENCE_GUIDE.md).
 
+## Probe isolation (model test-all)
+
+A **probe-origin failure** (model test-all / health-check dispatches executed
+inside `runAsProbe`) never removes a connection from the pool (#9817): it is
+**recorded for visibility** (`last_error`, `last_error_type`, `error_code`,
+`last_error_at`) but skips **every** routing mutation — cooldowns, terminal
+status (`banned` / `deactivated` / `credits_exhausted`), per-model lockouts,
+the provider circuit breaker, the 5-minute quota cache, OAuth token refresh
+and auto-disable. Only a real request-path failure deactivates. The recorded
+error is what makes a flagged account visible in the dashboard while it stays
+serving traffic.
+
+The single decision point is `shouldIsolateProbeFailures()`
+(`src/shared/utils/probeOrigin.ts`), consulted by **every** site that could
+mutate routing state from a probe-origin failure:
+
+- `markAccountUnavailable` (`auth.ts`) — record-only (`lastError` raw text,
+  `lastErrorType`, `errorCode`, `lastErrorAt`; deliberately **no**
+  `backoffLevel`, which would trigger the selection-time auto-decay and wipe
+  the record)
+- `maybeAutoDisableBannedAccount` — no auto-disable
+- `chatCore` — FORBIDDEN, ACCOUNT_DEACTIVATED, QUOTA_EXHAUSTED (record-only,
+  no terminal `credits_exhausted`), GEO_BLOCKED (no 24h exclusion),
+  MODEL_NOT_FOUND (no `lockModel`), the codex 429 account-rotation failover
+  (no `markCodexScopeRateLimited`, no persisted `rate_limited_until`, no
+  session-affinity clear), `persistCodexQuotaState` (no quota-state write,
+  no cache invalidation), `recordKeyHealthStatus` (key-health rotator
+  untouched)
+- OAuth refresh — both the proactive refresh in the executor base
+  (`base.ts` `execute()`, no refresh-token rotation consumed) and the
+  reactive 401/403 path in `chatCore` (no `expired` deactivation)
+- `chat.ts` — provider circuit breaker and the 5-minute quota cache
+  (`markAccountExhaustedFrom429`) never degraded
+
+The recorded error is what makes a flagged account visible in the dashboard
+while it stays serving traffic. Note: the probe record stores the **raw**
+(unsliced) error text, unlike the real path's `slice(0,100)` truncation.
+
+Operators who use test-all as a maintenance tool can restore the historical
+behavior (probe counts as a real generation) via either:
+
+- the `probeCanDisable` setting (`POST /api/settings` with
+  `{"probeCanDisable": true}`, or a direct `key_value` DB edit), or
+- feature flag **`PROBE_CAN_DISABLE=true`** (env or DB override; wins over the
+  setting).
+
+Fail-safe: if the flag or settings lookup throws, isolation stays ON.
+
 ## Source files
 
 | Concern                           | File                                                                                                          |
