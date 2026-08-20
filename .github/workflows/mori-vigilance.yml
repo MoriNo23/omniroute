@@ -287,19 +287,18 @@ jobs:
           if [ "$RISKY" = "true" ]; then RED=true; fi
           echo "RED=$RED" >> "$GITHUB_ENV"
           if [ "$RED" = "true" ]; then
-            cat > /tmp/body.md <<'EOM'
-            🚨 Detectado por mori-vigilance $(date -u +%Y-%m-%dT%H:%MZ).
-
-            - drift pendiente: NEEDS_MERGE
-            - conflictos de merge: CONFLICTS
-            - riesgo runtime local: RISKY
-
-            Merge manual con el skill:
-            python3 ~/.hermes/skills/development/omniroute-fork-workflow/scripts/omniroute_fork.py merge --apply
-
-            Run: https://github.com/FORK_REPO/actions/runs/RUN_ID
-            EOM
-            sed -i "s/NEEDS_MERGE/$NEEDS_MERGE/; s/CONFLICTS/$CONFLICTS/; s/RISKY/$RISKY/" /tmp/body.md
+            {
+              echo "🚨 Detectado por mori-vigilance $(date -u +%Y-%m-%dT%H:%MZ)."
+              echo ""
+              echo "- drift pendiente: $NEEDS_MERGE"
+              echo "- conflictos de merge: $CONFLICTS"
+              echo "- riesgo runtime local: $RISKY"
+              echo ""
+              echo "Consultar el skill:"
+              echo "python3 ~/.hermes/skills/development/omniroute-fork-workflow/scripts/omniroute_fork.py status"
+              echo ""
+              echo "Run: https://github.com/$FORK_REPO/actions/runs/$GITHUB_RUN_ID"
+            } > /tmp/body.md
             TITLE="🚨 omniroute fork: algo en rojo (mori-vigilance)"
             gh api --method GET "repos/$FORK_REPO/issues?state=open&labels=vigilance" > /tmp/issues.json || true
             EXISTING=$(python3 -c 'import json; d=json.load(open("/tmp/issues.json")); print(next((i["number"] for i in d if i["title"]=="'$TITLE'"), ""))' 2>/dev/null || true)
