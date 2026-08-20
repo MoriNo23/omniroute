@@ -10,6 +10,7 @@
 
 import { saveCallLog } from "@/lib/usageDb";
 import { sanitizeErrorMessage } from "../../utils/error.ts";
+import { formatSearchProviderFailure } from "./providerFailure.ts";
 import type { SearchProviderConfig } from "../../config/searchRegistry.ts";
 import type { SearchResult } from "../search.ts";
 
@@ -118,11 +119,7 @@ export interface ProviderFetchResult {
     results: SearchResult[];
     answer: null;
     usage: { queries_used: number; search_cost_usd: number };
-    metrics: {
-      response_time_ms: number;
-      upstream_latency_ms: number;
-      total_results_available: number | null;
-    };
+    metrics: { response_time_ms: number; upstream_latency_ms: number; total_results_available: number | null };
     errors: [];
   };
 }
@@ -163,9 +160,7 @@ export interface ExecuteProviderFetchParams {
  * This is the single chokepoint tryProvider() delegates to after building
  * the request and resolving the proxy — keeps search.ts to wiring only.
  */
-export async function executeProviderFetch(
-  p: ExecuteProviderFetchParams
-): Promise<ProviderFetchResult> {
+export async function executeProviderFetch(p: ExecuteProviderFetchParams): Promise<ProviderFetchResult> {
   const { config, url, init, controller, timer, query, searchType, maxResults, startTime } = p;
   const { connectionId, proxy, proxyLevel, log, normalize } = p;
   const emitEvent = (status: string) =>
@@ -195,11 +190,7 @@ export async function executeProviderFetch(
       if (log) {
         log.error("SEARCH", `${config.id} error ${response.status}: ${errorText.slice(0, 200)}`);
       }
-      logCall({
-        status: response.status,
-        duration: Date.now() - startTime,
-        error: errorText.slice(0, 500),
-      });
+      logCall({ status: response.status, duration: Date.now() - startTime, error: errorText.slice(0, 500) });
       await emitEvent("error");
       return {
         success: false,
@@ -241,22 +232,12 @@ export async function executeProviderFetch(
     clearTimeout(timer);
     const error = err instanceof Error ? err : new Error(String(err));
     const isTimeout = error.name === "AbortError";
+    const safeMsg = sanitizeErrorMessage(error.message) || "fetch failed";
     if (log) {
-      log.error(
-        "SEARCH",
-        `${config.id} ${isTimeout ? "timeout" : "fetch error"}: ${error.message}`
-      );
+      log.error("SEARCH", `${config.id} ${isTimeout ? "timeout" : "fetch error"}: ${safeMsg}`);
     }
-    logCall({
-      status: isTimeout ? 504 : 502,
-      duration: Date.now() - startTime,
-      error: error.message,
-    });
+    logCall({ status: isTimeout ? 504 : 502, duration: Date.now() - startTime, error: safeMsg });
     await emitEvent(isTimeout ? "timeout" : "error");
-    return {
-      success: false,
-      status: isTimeout ? 504 : 502,
-      error: `Search provider ${isTimeout ? "timeout" : "error"}: ${sanitizeErrorMessage(error.message)}`,
-    };
+    return formatSearchProviderFailure(config.id, error, isTimeout);
   }
 }
