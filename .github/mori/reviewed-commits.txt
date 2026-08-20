@@ -1,0 +1,12 @@
+# Commits de upstream que tocan la watchlist del runtime tuning (Gate 1 de
+# mori-vigilance) y fueron REVISADOS manualmente. Si un commit pendiente que
+# toca la watchlist NO está acá, el auto-merge se bloquea.
+#
+# Formato: un SHA corto por línea, líneas con '#' se ignoran.
+#
+# 74c54828  #10162 "[defer] fix(routing): keep approximate context estimates
+#          # advisory" — quita el hard-block 400 de context overflow en combo
+#          # routing (ahora advisory). Revisado 2026-08-20 por el usuario:
+#          # toca solo lógica de routing (combo.ts, comboStructure,
+#          # targetResolution), NO compresión/quota/limits. Riesgo bajo.
+74c54828

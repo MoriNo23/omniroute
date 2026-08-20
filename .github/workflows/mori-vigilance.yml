@@ -67,14 +67,25 @@ jobs:
           fi
           echo "🚨 DRIFT: $DRIFT commits de upstream pendientes" >> "$GITHUB_STEP_SUMMARY"
 
-          # Gate 1: riesgo runtime (watchlist del tuning de esta máquina)
+          # Gate 1: riesgo runtime (watchlist del tuning de esta máquina).
+          # Si todos los commits que tocan los archivos riesgosos YA fueron
+          # revisados (.github/mori/reviewed-commits.txt) se procede; si hay
+          # commits nuevos tocando la watchlist, se bloquea el auto-merge.
           RISKY=$(git diff --name-only "HEAD...upstream/$UPSTREAM_BRANCH" | grep -E '^(open-sse/services/compression/|open-sse/services/combo\.ts|open-sse/services/fusion\.ts|open-sse/utils/circuitBreaker|src/shared/utils/circuitBreaker|open-sse/services/quota|open-sse/services/limits|config/|docker-compose|Dockerfile)' | grep -vE '^config/quality/' || true)
           if [ -n "$RISKY" ]; then
-            echo "⚠️  upstream toca runtime tuning — NO auto-merge (revisar manual)" >> "$GITHUB_STEP_SUMMARY"
-            echo "$RISKY" >> "$GITHUB_STEP_SUMMARY"
-            echo "needs_merge=true" >> "$GITHUB_OUTPUT"
-            echo "auto_merged=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            REVIEWED=$(cat .github/mori/reviewed-commits.txt 2>/dev/null | grep -v '^#' || true)
+            UNREVIEWED=$(for f in $RISKY; do git log --format=%H "HEAD..upstream/$UPSTREAM_BRANCH" -- "$f"; done | sort -u | grep -vFf <(printf '%s\n' "$REVIEWED") || true)
+            if [ -z "$UNREVIEWED" ]; then
+              echo "✅ runtime tuning tocado pero YA revisado: $RISKY" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "⚠️  upstream toca runtime tuning — NO auto-merge (revisar manual)" >> "$GITHUB_STEP_SUMMARY"
+              echo "$RISKY" >> "$GITHUB_STEP_SUMMARY"
+              echo "revisar (watchlist):" >> "$GITHUB_STEP_SUMMARY"
+              echo "$UNREVIEWED" >> "$GITHUB_STEP_SUMMARY"
+              echo "needs_merge=true" >> "$GITHUB_OUTPUT"
+              echo "auto_merged=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
           fi
 
           # Gate 2: conflictos de merge (merge-tree, sin tocar el working tree)
